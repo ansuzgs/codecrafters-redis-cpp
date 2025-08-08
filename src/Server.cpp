@@ -8,7 +8,24 @@
 #include <string_view>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <thread>
 #include <unistd.h>
+
+void handle_response(int client_fd) {
+
+  char buffer[1024];
+
+  while (true) {
+    int num_bytes = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+    if (num_bytes <= 0) {
+      std::cout << "Failed to read payload." << std::endl;
+      close(client_fd);
+    }
+    std::string response = std::string("+PONG\r\n");
+    send(client_fd, response.c_str(), response.size(), 0);
+  }
+  close(client_fd);
+}
 
 int main(int argc, char **argv) {
   // Flush after every std::cout / std::cerr
@@ -49,34 +66,22 @@ int main(int argc, char **argv) {
 
   struct sockaddr_in client_addr;
   int client_addr_len = sizeof(client_addr);
-  std::cout << "Waiting for a client to connect...\n";
-
-  // You can use print statements as follows for debugging, they'll be visible
-  // when running tests.
-  std::cout << "Logs from your program will appear here!\n";
-
-  // Uncomment this block to pass the first stage
-  //
-  int client_fd = accept(server_fd, (struct sockaddr *)&client_addr,
-                         (socklen_t *)&client_addr_len);
-  std::cout << "Client connected\n";
-
-  std::array<char, 1024> buffer;
   while (true) {
-    int bytes_received = recv(client_fd, buffer.data(), buffer.size(), 0);
-    if (bytes_received < 0) {
-      std::cerr << "Error reading";
-      break;
-    }
-    std::string_view received_message{buffer.data(),
-                                      static_cast<size_t>(bytes_received)};
-    if (received_message.find("PING") != std::string::npos) {
-      const char reply[] = "+PONG\r\n";
-      send(client_fd, reply, sizeof(reply) - 1, 0);
-    }
-  }
+    std::cout << "Waiting for a client to connect...\n";
 
-  close(client_fd);
+    // You can use print statements as follows for debugging, they'll be visible
+    // when running tests.
+    std::cout << "Logs from your program will appear here!\n";
+
+    // Uncomment this block to pass the first stage
+    //
+    int client_fd = accept(server_fd, (struct sockaddr *)&client_addr,
+                           (socklen_t *)&client_addr_len);
+    std::cout << "Client connected\n";
+
+    std::thread client_thread(handle_response, client_fd);
+    client_thread.detach();
+  }
   //
   close(server_fd);
 
