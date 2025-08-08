@@ -10,7 +10,7 @@ template <class... Ts> struct overloaded : Ts... {
 };
 template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
-inline std::string serialize(Value const &rv) {
+std::string serialize(Value const &rv) {
   return std::visit(
       overloaded{
           [&](SimpleString const &x) {
@@ -19,10 +19,6 @@ inline std::string serialize(Value const &rv) {
           [&](Error const &x) { return std::string{"-"} + x.s + "\r\n"; },
           [&](Integer const &x) {
             return std::string{":"} + std::to_string(x.i) + "\r\n";
-          },
-          [&](BulkString const &x) {
-            return std::string{"$"} + std::to_string(x.s.size()) + "\r\n" +
-                   x.s + "\r\n";
           },
           [&](BulkString const &x) {
             return std::string{"$"} + std::to_string(x.s.size()) + "\r\n" +

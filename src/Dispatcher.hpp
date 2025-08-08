@@ -19,8 +19,7 @@ static std::string readLine(int fd) {
   return s;
 }
 
-static BulkString readBulk(int fd) {
-  auto hdr = readLine(fd);
+static BulkString readBulk(int fd, std::string const &hdr) {
   int len = std::stoi(hdr.substr(1));
   if (len < 0) {
     return {""};
@@ -49,7 +48,7 @@ static Value parseValue(int fd) {
   case '-':
     return Error{hdr.substr(1)};
   case '$': {
-    auto bs = readBulk(fd);
+    auto bs = readBulk(fd, hdr);
     return bs;
   }
   case '*': {
