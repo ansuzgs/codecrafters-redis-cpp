@@ -59,8 +59,19 @@ int main(int argc, char **argv) {
                          (socklen_t *)&client_addr_len);
   std::cout << "Client connected\n";
 
-  std::string response = "+PONG\r\n";
-  send(client_fd, response.c_str(), response.size(), 0);
+  char buffer[1024] = {0};
+  while (true) {
+    int bytes_received = read(client_fd, buffer, sizeof(buffer));
+    if (bytes_received < 0) {
+      std::cerr << "Error reading";
+      break;
+    }
+    std::string received_message(buffer);
+    if (received_message.find("PING") != std::string::npos) {
+      std::string response = "+PONG\r\n";
+      send(client_fd, response.c_str(), response.size(), 0);
+    }
+  }
 
   close(client_fd);
   //
