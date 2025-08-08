@@ -1,9 +1,11 @@
 #include <arpa/inet.h>
+#include <array>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <netdb.h>
 #include <string>
+#include <string_view>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -59,17 +61,18 @@ int main(int argc, char **argv) {
                          (socklen_t *)&client_addr_len);
   std::cout << "Client connected\n";
 
-  char buffer[1024] = {0};
+  std::array<char, 1024> buffer;
   while (true) {
-    int bytes_received = read(client_fd, buffer, sizeof(buffer));
+    int bytes_received = recv(client_fd, buffer.data(), buffer.size(), 0);
     if (bytes_received < 0) {
       std::cerr << "Error reading";
       break;
     }
-    std::string received_message(buffer);
+    std::string_view received_message{buffer.data(),
+                                      static_cast<size_t>(bytes_received)};
     if (received_message.find("PING") != std::string::npos) {
-      std::string response = "+PONG\r\n";
-      send(client_fd, response.c_str(), response.size(), 0);
+      const char reply[] = "+PONG\r\n";
+      send(client_fd, reply, sizeof(reply) - 1, 0);
     }
   }
 
