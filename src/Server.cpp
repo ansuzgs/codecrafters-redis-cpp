@@ -1,31 +1,14 @@
 #include <arpa/inet.h>
-#include <array>
-#include <cstdlib>
-#include <cstring>
 #include <iostream>
 #include <netdb.h>
 #include <string>
-#include <string_view>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <thread>
 #include <unistd.h>
 
-void handle_response(int client_fd) {
-
-  char buffer[1024];
-
-  while (true) {
-    int num_bytes = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
-    if (num_bytes <= 0) {
-      std::cout << "Failed to read payload." << std::endl;
-      close(client_fd);
-    }
-    std::string response = std::string("+PONG\r\n");
-    send(client_fd, response.c_str(), response.size(), 0);
-  }
-  close(client_fd);
-}
+#include "Dispatcher.hpp"
+#include "RESP.hpp"
 
 int main(int argc, char **argv) {
   // Flush after every std::cout / std::cerr
@@ -66,6 +49,22 @@ int main(int argc, char **argv) {
 
   struct sockaddr_in client_addr;
   int client_addr_len = sizeof(client_addr);
+
+  // Registramos los comandos
+  Dispatcher disp;
+  disp.register_cmd("PING", [](auto const &args) {
+    if (args.empty()) {
+      return Value{SimpleString{"PONG"}};
+    }
+    auto &bs = std::get<BulkString>(args[0].v);
+    return Value{BulkString{bs.s}};
+  });
+
+  disp.register_cmd("ECHO", [](auto const &args) {
+    auto &bs = std::get<BulkString>(args[0].v);
+    return Value{BulkString{bs.s}};
+  });
+
   while (true) {
     std::cout << "Waiting for a client to connect...\n";
 
@@ -79,9 +78,14 @@ int main(int argc, char **argv) {
                            (socklen_t *)&client_addr_len);
     std::cout << "Client connected\n";
 
-    std::thread client_thread(handle_response, client_fd);
-    client_thread.detach();
+    std::thread([client_fd, &disp]() {
+      Value resp = disp.dispatch(client_fd);
+      std::string out = serialize(resp);
+      send(client_fd, out.data(), out.size(), 0);
+      close(client_fd);
+    }).detach();
   }
+
   //
   close(server_fd);
 
